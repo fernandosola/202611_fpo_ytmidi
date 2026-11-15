@@ -1,12 +1,15 @@
 """Isolated YourMT3+ inference process and explicit asset setup."""
 
 import argparse
+import gc
 import importlib
 import json
 import os
 import sys
 import time
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
@@ -69,6 +72,25 @@ def load_model(directory: Path, device: str) -> Any:
     return network.eval().to(device)
 
 
+@contextmanager
+def model_session(directory: Path, device: str) -> Iterator[Any]:
+    torch = importlib.import_module("torch")
+    model = None
+    try:
+        model = load_model(directory, "cpu")
+        yield model.to(device)
+    finally:
+        try:
+            if model is not None:
+                model.cpu()
+        finally:
+            model = None
+            gc.collect()
+            if device == "cuda":
+                torch.cuda.empty_cache()
+                print("CUDA model unloaded; allocator cache cleared.", flush=True)
+
+
 def install_assets(directory: Path, device: str) -> None:
     hub = importlib.import_module("huggingface_hub")
     source = directory / "source"
@@ -82,9 +104,8 @@ def install_assets(directory: Path, device: str) -> None:
     if file_sha256(source / CHECKPOINT_FILE) != CHECKPOINT_SHA256:
         raise RuntimeError("Downloaded checkpoint does not match the published SHA-256.")
     selected = select_device(device)
-    model = load_model(directory, selected)
     torch = importlib.import_module("torch")
-    with torch.inference_mode():
+    with model_session(directory, selected) as model, torch.inference_mode():
         model.inference_file(
             bsz=1, audio_segments=torch.zeros(1, 1, model.audio_cfg["input_frames"])
         )
@@ -114,7 +135,12 @@ def transcribe(request: dict[str, Any], directory: Path) -> dict[str, Any]:
     device = select_device(request["device"])
     torch = importlib.import_module("torch")
     torch.set_num_threads(min(8, os.cpu_count() or 1))
-    model = load_model(directory, device)
+    with model_session(directory, device) as model:
+        return _transcribe_with_model(request, model, device)
+
+
+def _transcribe_with_model(request: dict[str, Any], model: Any, device: str) -> dict[str, Any]:
+    torch = importlib.import_module("torch")
     torchaudio = importlib.import_module("torchaudio")
     audio_utils = importlib.import_module("utils.audio")
     events = importlib.import_module("utils.event2note")

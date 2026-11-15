@@ -186,6 +186,13 @@ download a 1 GiB. Para duas horas, acrescente `--max-duration 7200`; ajuste
 `--max-download-size` em bytes somente se necessario.
 `--batch-size 1` reduz pressao de VRAM. `prepare` pode ser usado sem modelo.
 
+Antes de o worker finalizar, `setup-model` e `convert` retiram o modelo da GPU,
+executam coleta de lixo e liberam o cache CUDA livre, inclusive em excecoes e
+interrupcoes Python. Isso e automatico, sem flags; `worker.log` registra
+`CUDA model unloaded; allocator cache cleared.` nas conversoes CUDA.
+O contexto CUDA restante e liberado quando o processo termina. Nao se apagam
+os pesos do volume nem se interfere na memoria de outras aplicacoes.
+
 ## Sem Compose
 
 Os mounts e a imagem sao os mesmos:

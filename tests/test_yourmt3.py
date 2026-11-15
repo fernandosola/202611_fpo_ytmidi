@@ -3,14 +3,17 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Literal
+from unittest.mock import Mock
 
 import pretty_midi
 import pytest
 
-from youtube_midi import yourmt3
+from youtube_midi import yourmt3, yourmt3_worker
 from youtube_midi.errors import DependencyError
 from youtube_midi.models import ConversionOptions
 from youtube_midi.pipeline import run_conversion
@@ -146,6 +149,80 @@ def test_installed_worker_prefers_runtime_dependencies(tmp_path: Path) -> None:
         check=True,
     )
     assert result.stdout.splitlines() == ["runtime", "cpu"]
+
+
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "setup",
+        "setup-error",
+        "transcribe-error",
+        "transcribe-cancel",
+        "load-error",
+        "transfer-error",
+    ],
+)
+def test_worker_releases_model_before_return_or_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, device: str, operation: str
+) -> None:
+    calls: list[str] = []
+    failure = (
+        KeyboardInterrupt("inference failed")
+        if operation == "transcribe-cancel"
+        else RuntimeError("inference failed")
+    )
+    model = Mock()
+    model.to.return_value = model
+    model.cpu.side_effect = lambda: calls.append("model.cpu")
+    model.audio_cfg = {"input_frames": 32767}
+    if operation == "setup-error":
+        model.inference_file.side_effect = failure
+    if operation == "transfer-error":
+        model.to.side_effect = failure
+    loader = Mock(return_value=model)
+    if operation == "load-error":
+        loader.side_effect = failure
+    torch = SimpleNamespace(
+        inference_mode=nullcontext,
+        zeros=Mock(),
+        set_num_threads=Mock(),
+        __version__="fixture",
+        version=SimpleNamespace(cuda="fixture"),
+        cuda=SimpleNamespace(empty_cache=lambda: calls.append("cuda.empty_cache")),
+    )
+    modules = {
+        "torch": torch,
+        "huggingface_hub": SimpleNamespace(snapshot_download=Mock()),
+    }
+    real_import = yourmt3_worker.importlib.import_module
+
+    def import_module(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "torchaudio":
+            raise failure
+        return modules[name] if name in modules else real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(yourmt3_worker.importlib, "import_module", import_module)
+    monkeypatch.setattr(yourmt3_worker, "select_device", lambda _: device)
+    monkeypatch.setattr(yourmt3_worker, "load_model", loader)
+    monkeypatch.setattr(yourmt3_worker, "validate_assets", lambda _: {})
+    monkeypatch.setattr(yourmt3_worker, "file_sha256", lambda _: yourmt3.CHECKPOINT_SHA256)
+    monkeypatch.setattr(yourmt3_worker.gc, "collect", lambda: calls.append("gc.collect"))
+    if operation == "setup":
+        yourmt3_worker.install_assets(tmp_path, device)
+        assert (tmp_path / "manifest.json").exists()
+    else:
+        with pytest.raises(type(failure), match="inference failed"):
+            if operation.startswith("transcribe"):
+                yourmt3_worker.transcribe(
+                    {"schema_version": 1, "batch_size": 1, "device": device}, tmp_path
+                )
+            else:
+                yourmt3_worker.install_assets(tmp_path, device)
+    expected = ["gc.collect"] if operation == "load-error" else ["model.cpu", "gc.collect"]
+    if device == "cuda":
+        expected.append("cuda.empty_cache")
+    assert calls == expected
 
 
 @pytest.fixture
