@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "youtube-midi"
+dynamic = ["version"]
+description = "Local YouTube video to multitrack MIDI pipeline."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pretty-midi>=0.2.10,<1",
+    "typer>=0.16,<1",
+    "yt-dlp[default]>=2025.11.12,<2027",
+]
+
+[project.scripts]
+yt-midi = "youtube_midi.cli:app"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18,<2",
+    "pre-commit>=4,<5",
+    "pytest>=8,<10",
+    "pytest-cov>=6,<8",
+    "ruff>=0.14,<1",
+]
+
+[tool.hatch.version]
+path = "src/youtube_midi/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/youtube_midi"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/youtube_midi"]
+
+[[tool.mypy.overrides]]
+module = ["yt_dlp", "yt_dlp.*", "pretty_midi", "pretty_midi.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-config --strict-markers"
+markers = [
+    "integration: local integration with external binaries",
+    "model: inference with pretrained model assets",
+    "gpu: requires a compatible GPU",
+    "network: requires explicit internet access",
+]
+
+[tool.coverage.run]
+source = ["youtube_midi"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true

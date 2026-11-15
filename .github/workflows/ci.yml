@@ -1,0 +1,32 @@
+name: Python checks
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.30"
+          enable-cache: true
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install locked dependencies
+        run: uv sync --locked --python 3.11 --group dev
+      - name: Lint
+        run: uv run ruff check .
+      - name: Formatting
+        run: uv run ruff format --check .
+      - name: Types
+        run: uv run mypy
+      - name: Tests without models or network
+        run: uv run pytest -m 'not model and not network and not gpu' --cov=youtube_midi
+      - name: CLI smoke test
+        run: uv run yt-midi --help
+      - name: Build package
+        run: uv build
