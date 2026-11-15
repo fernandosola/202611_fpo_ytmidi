@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -119,6 +120,32 @@ def test_setup_uses_locked_cuda_index(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert commands[1][commands[1].index("--torch-backend") + 1] == "cu124"
     assert "--require-hashes" in commands[1]
     assert commands[2][-2:] == ["--device", "cuda"]
+
+
+def test_installed_worker_prefers_runtime_dependencies(tmp_path: Path) -> None:
+    cli_site = tmp_path / "cli-site"
+    runtime_site = tmp_path / "runtime-site"
+    runtime_site.mkdir()
+    package = cli_site / "youtube_midi"
+    shutil.copytree(
+        Path(yourmt3.__file__).parent,
+        package,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    (cli_site / "numpy.py").write_text("__version__ = 'cli'\n", encoding="utf-8")
+    (runtime_site / "numpy.py").write_text("__version__ = 'runtime'\n", encoding="utf-8")
+    (runtime_site / "torch.py").write_text(
+        "import numpy\nprint(numpy.__version__)\n", encoding="utf-8"
+    )
+    result = subprocess.run(
+        [sys.executable, str(package / "yourmt3_worker.py"), "--check", "--device", "cpu"],
+        env={**os.environ, "PYTHONPATH": str(runtime_site)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    assert result.stdout.splitlines() == ["runtime", "cpu"]
 
 
 @pytest.fixture

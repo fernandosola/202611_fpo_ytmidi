@@ -53,6 +53,24 @@ percussao explicita, ausencia de mudanca silenciosa de dispositivo e continuidad
 de notas nas fronteiras dos segmentos. Avaliacao musical e separada dos testes
 de software; registre checkpoint, classes, metricas e consumo de VRAM.
 
+## Docker
+
+Antes de alterar o empacotamento, execute:
+
+```bash
+mkdir -p output
+export LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)"
+docker compose config --quiet
+docker compose build cpu
+docker compose run --rm cpu --help
+docker compose run --rm cpu doctor --json
+```
+
+A CI tambem verifica ferramentas, escrita nao-root e preparo de midia sintetica.
+Nao inclua pesos, GPU ou download YouTube nesse gate rapido. Ao alterar worker
+ou isolamento de ambientes, valide modelo real CPU/GPU separadamente, incluindo
+instalacao via wheel e inferencia sem rede. [Comandos e requisitos](docs/docker.md).
+
 ## Codigos de saida
 
 | Codigo | Significado |

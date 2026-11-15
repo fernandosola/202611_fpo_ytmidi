@@ -38,6 +38,27 @@ uv run yt-midi doctor --json
 O Python 3.10 do sistema nao precisa ser alterado. O uv usa a versao indicada
 pela configuracao do projeto.
 
+Tutoriais por pre-requisito: [instalacao local](docs/installation.md).
+Para executar sem instalar essas ferramentas no host, siga [Docker](docs/docker.md).
+
+## Docker
+
+A imagem inclui CLI, Python, uv, FFmpeg e Deno. O modelo fica em um volume
+persistente, instalado uma vez; CPU e GPU usam a mesma imagem.
+
+```bash
+mkdir -p output
+export LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)"
+docker compose build cpu
+docker compose run --rm gpu setup-model --device cuda
+docker compose run --rm gpu convert 'https://www.youtube.com/watch?v=<ID_DO_VIDEO>' --device cuda
+```
+
+Para CPU, use o servico `cpu` e `--device cpu` nos dois comandos.
+Saidas permanecem em `output`; modelos no volume `youtube-midi-models`.
+Veja [instalacao Docker, GPU, audio local e permissoes](docs/docker.md).
+Nao use `docker compose down -v` se quiser preservar o modelo.
+
 ## Preparar video e audio
 
 ```bash

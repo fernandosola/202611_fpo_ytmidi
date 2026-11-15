@@ -1,0 +1,42 @@
+name: youtube-midi
+
+x-runtime: &runtime
+  image: youtube-midi:local
+  platform: linux/amd64
+  build:
+    context: .
+    args:
+      APP_UID: ${LOCAL_UID:-1000}
+      APP_GID: ${LOCAL_GID:-1000}
+  init: true
+  volumes:
+    - models:/models
+    - type: bind
+      source: ./output
+      target: /data/output
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${YT_MIDI_INPUT_DIR:-./output}
+      target: /input
+      read_only: true
+      bind:
+        create_host_path: false
+
+services:
+  cpu:
+    <<: *runtime
+  gpu:
+    <<: *runtime
+    profiles: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  models:
+    name: youtube-midi-models

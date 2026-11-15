@@ -30,3 +30,82 @@ jobs:
         run: uv run yt-midi --help
       - name: Build package
         run: uv build
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and build image
+        run: |
+          mkdir -p output
+          export LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)"
+          docker compose config --quiet
+          docker compose build cpu
+      - name: CLI smoke test without network or models
+        run: |
+          docker run --rm --network none youtube-midi:local --help
+          docker run --rm --network none youtube-midi:local doctor --json
+      - name: Tools, non-root permissions and local audio preparation
+        run: |
+          docker run --rm -i --init --network none \
+            --mount type=volume,dst=/models \
+            --mount "type=bind,src=$PWD/output,dst=/data/output" \
+            --entrypoint python youtube-midi:local - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          import tempfile
+          import wave
+
+          from youtube_midi import cli
+
+          assert os.getuid() != 0
+          assert sys.version_info[:2] == (3, 11)
+          assert importlib.util.find_spec("torch") is None
+          assert "torch" not in sys.modules
+          package = Path(cli.__file__).parent
+          assert (package / "yourmt3_worker.py").is_file()
+          assert (package / "assets/yourmt3-requirements.txt").is_file()
+          for directory in ("/models", "/data/output"):
+              with tempfile.TemporaryFile(dir=directory):
+                  pass
+          for command in (
+              ["uv", "--version"],
+              ["deno", "--version"],
+              ["deno", "eval", 'console.log("Deno OK")'],
+              ["ffmpeg", "-version"],
+              ["ffprobe", "-version"],
+          ):
+              result = subprocess.run(command, check=True, capture_output=True, text=True)
+              print(result.stdout.splitlines()[0])
+          result = subprocess.run(
+              ["yt-midi", "doctor", "--json"], check=True, capture_output=True, text=True
+          )
+          doctor = json.loads(result.stdout)
+          assert not doctor["model"]["ready"]
+          assert all(doctor["binaries"][name] for name in ("ffmpeg", "ffprobe", "deno"))
+          source = Path("/data/output/source with spaces.wav")
+          subprocess.run(
+              ["ffmpeg", "-nostdin", "-v", "error", "-f", "lavfi", "-i",
+               "sine=frequency=440:duration=1", "-ac", "2", "-ar", "44100", str(source)],
+              check=True,
+          )
+          result = subprocess.run(
+              ["yt-midi", "prepare", "--audio-file", str(source)],
+              check=True, capture_output=True, text=True,
+          )
+          report = Path(result.stdout.strip())
+          data = json.loads(report.read_text())
+          assert data["status"] == "prepared"
+          assert source.is_file()
+          with wave.open(str(report.parent / "audio.wav"), "rb") as audio:
+              assert audio.getnchannels() == 2
+              assert audio.getframerate() == 44100
+              assert audio.getnframes() == 44100
+          assert report.stat().st_uid == os.getuid()
+          print("Docker smoke checks passed", report)
+          PY

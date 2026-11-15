@@ -1,0 +1,11 @@
+**
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!src/youtube_midi/
+!src/youtube_midi/*.py
+!src/youtube_midi/assets/
+!src/youtube_midi/assets/yourmt3-requirements.in
+!src/youtube_midi/assets/yourmt3-requirements.txt
