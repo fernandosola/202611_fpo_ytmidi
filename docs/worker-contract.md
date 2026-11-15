@@ -1,14 +1,14 @@
 # Contrato do worker
 
-O worker YourMT3+ incluido usa este contrato e e selecionado por padrao apos
+O worker YourMT3+ incluído usa este contrato e é selecionado por padrão após
 `yt-midi setup-model`. Backends personalizados podem ser selecionados com
-`--worker` e `--worker-python`. O adapter nao e uma sandbox para scripts desconhecidos.
+`--worker` e `--worker-python`. O adapter não é uma sandbox para scripts desconhecidos.
 
-## Execucao
+## Execução
 
 O processo recebe `--request <arquivo>` e `--response <arquivo>`. Deve usar o
-ambiente/modelo ja preparados, nao fazer downloads, registrar logs em stdout
-ou stderr e retornar zero somente depois de escrever uma resposta valida.
+ambiente/modelo já preparados, não fazer downloads, registrar logs em stdout
+ou stderr e retornar zero somente depois de escrever uma resposta válida.
 
 Request:
 
@@ -26,14 +26,14 @@ Request:
 }
 ```
 
-O backend adapta audio para a taxa/canais reais do checkpoint. O processamento
+O backend adapta áudio para a taxa/canais reais do checkpoint. O processamento
 deve limitar lotes na GPU e preservar notas sustentadas entre segmentos.
-`auto` pode escolher CPU/CUDA; `cuda` ou `cpu` explicitos nao permitem troca silenciosa.
+`auto` pode escolher CPU/CUDA; `cuda` ou `cpu` explícitos não permitem troca silenciosa.
 
 ## Resposta
 
-Exemplo ilustrativo de formato, **nao resultado de um modelo real**. O hash
-de zeros deve ser substituido pelo SHA-256 real dos pesos utilizados.
+Exemplo ilustrativo de formato, **não resultado de um modelo real**. O hash
+de zeros deve ser substituído pelo SHA-256 real dos pesos utilizados.
 
 ```json
 {
@@ -59,17 +59,17 @@ de zeros deve ser substituido pelo SHA-256 real dos pesos utilizados.
 ```
 
 - Schema version 1; resposta com limite de 16 MiB.
-- Cada track representa uma classe de instrumento identificada, nao um canal interno.
-- Nomes nao vazios; programa GM inteiro 0..127; percussao com booleano `is_drum`.
-- Pitch inteiro 0..127; velocity inteiro 1..127, opcional com padrao 100.
-- Start/end numericos, finitos, em segundos; start >= 0 e end > start.
-- Notas nao podem exceder a duracao do audio em mais de 100 ms de tolerancia.
-- Tracks podem estar vazias; se nao houver nenhuma nota, exportacao falha claramente.
-- Registrar limitacoes em warnings, sem fabricar instrumentos ausentes.
-- O backend nativo verifica os hashes da fonte e do checkpoint antes da inferencia.
-  Para workers externos, a proveniencia reportada e registrada, mas sua verificacao
+- Cada track representa uma classe de instrumento identificada, não um canal interno.
+- Nomes não vazios; programa GM inteiro 0..127; percussão com booleano `is_drum`.
+- Pitch inteiro 0..127; velocity inteiro 1..127, opcional com padrão 100.
+- Start/end numéricos, finitos, em segundos; start >= 0 e end > start.
+- Notas não podem exceder a duração do áudio em mais de 100 ms de tolerância.
+- Tracks podem estar vazias; se não houver nenhuma nota, exportação falha claramente.
+- Registrar limitações em warnings, sem fabricar instrumentos ausentes.
+- O backend nativo verifica os hashes da fonte e do checkpoint antes da inferência.
+  Para workers externos, a proveniência reportada é registrada, mas sua verificação
   real continua sob responsabilidade do backend personalizado.
 
-Resposta inexistente/invalida, processo com erro, timeout ou troca de dispositivo
-resultam em falha de transcricao. Logs permanecem em `worker.log` no job; request
-e response sao intermediarios, preservados somente com `--keep-intermediates`.
+Resposta inexistente/inválida, processo com erro, timeout ou troca de dispositivo
+resultam em falha de transcrição. Logs permanecem em `worker.log` no job; request
+e response são intermediários, preservados somente com `--keep-intermediates`.

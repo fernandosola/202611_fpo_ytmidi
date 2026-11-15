@@ -2,43 +2,43 @@
 
 ## Ambiente
 
-Use Python 3.11 pelo uv e mantenha as dependencias em `pyproject.toml`.
-Versione `uv.lock`. Nao mantenha uma segunda lista de dependencias manual em
+Use Python 3.11 pelo uv e mantenha as dependências em `pyproject.toml`.
+Versione `uv.lock`. Não mantenha uma segunda lista de dependências manual em
 requirements.txt nem instale o modelo no ambiente da CLI.
 
 ```bash
 uv sync --locked --group dev
 ```
 
-Depois que houver um repositorio Git inicializado, instale os hooks:
+Depois que houver um repositório Git inicializado, instale os hooks:
 
 ```bash
 uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
-## Padroes
+## Padrões
 
-- Layout src, modulos pequenos, snake_case e classes em PascalCase.
-- Type hints nas interfaces e contratos imutaveis com dataclasses.
-- Ruff: lint, imports e formatacao; limite de 100 colunas e quatro espacos.
-- mypy strict no codigo proprio. Excecoes de imports somente para bibliotecas sem stubs.
-- Erros especificos por etapa, mensagens claras e logging padrao.
+- Layout src, módulos pequenos, snake_case e classes em PascalCase.
+- Type hints nas interfaces e contratos imutáveis com dataclasses.
+- Ruff: lint, imports e formatação; limite de 100 colunas e quatro espaços.
+- mypy strict no código próprio. Exceções de imports somente para bibliotecas sem stubs.
+- Erros específicos por etapa, mensagens claras e logging padrão.
 - Nenhum import de torch/JAX/TensorFlow em `--help` ou `doctor`.
 - APIs/JSON estruturado para bibliotecas externas, sem interpretar stdout humano.
-- Subprocessos sem shell; paths exclusivos por job; nao sobrescrever entrada ou saidas alheias.
-- Sem refatoracoes nao relacionadas, segredos, grandes midias ou pesos no Git.
+- Subprocessos sem shell; paths exclusivos por job; não sobrescrever entrada ou saídas alheias.
+- Sem refatorações não relacionadas, segredos, grandes mídias ou pesos no Git.
 
 ## Testes
 
 Adicione testes perto da etapa alterada, reutilizando fixtures de `tests/conftest.py`.
-As notas dos testes de MIDI e worker sao fixtures, nao predicoes de modelo.
+As notas dos testes de MIDI e worker são fixtures, não predições de modelo.
 Os testes FFmpeg usam WAV gerado localmente, sem material protegido.
 
-Marcadores: `integration` para binarios locais, `network` para acesso externo,
+Marcadores: `integration` para binários locais, `network` para acesso externo,
 `model` para pesos reais e `gpu` para hardware. Testes do modelo ou YouTube
-nao entram na CI rapida. Ausencia de FFmpeg pula somente os testes dependentes;
-a CI instala FFmpeg para executar essa integracao.
+não entram na CI rápida. Ausência de FFmpeg pula somente os testes dependentes;
+a CI instala FFmpeg para executar essa integração.
 
 ```bash
 uv run pytest -m 'not model and not network and not gpu' --cov=youtube_midi
@@ -48,10 +48,10 @@ uv run mypy
 uv build
 ```
 
-Mudancas no worker exigem contrato valido, programa GM 0..127, tempos finitos,
-percussao explicita, ausencia de mudanca silenciosa de dispositivo e continuidade
-de notas nas fronteiras dos segmentos. Avaliacao musical e separada dos testes
-de software; registre checkpoint, classes, metricas e consumo de VRAM.
+Mudanças no worker exigem contrato válido, programa GM 0..127, tempos finitos,
+percussão explícita, ausência de mudança silenciosa de dispositivo e continuidade
+de notas nas fronteiras dos segmentos. Avaliação musical é separada dos testes
+de software; registre checkpoint, classes, métricas e consumo de VRAM.
 
 ## Docker
 
@@ -66,21 +66,21 @@ docker compose run --rm cpu --help
 docker compose run --rm cpu doctor --json
 ```
 
-A CI tambem verifica ferramentas, escrita nao-root e preparo de midia sintetica.
-Nao inclua pesos, GPU ou download YouTube nesse gate rapido. Ao alterar worker
+A CI também verifica ferramentas, escrita não-root e preparo de mídia sintética.
+Não inclua pesos, GPU ou download YouTube nesse gate rápido. Ao alterar worker
 ou isolamento de ambientes, valide modelo real CPU/GPU separadamente, incluindo
-instalacao via wheel e inferencia sem rede. [Comandos e requisitos](docs/docker.md).
+instalação via wheel e inferência sem rede. [Comandos e requisitos](docs/docker.md).
 
-## Codigos de saida
+## Códigos de saída
 
-| Codigo | Significado |
+| Código | Significado |
 | --- | --- |
 | 0 | Sucesso |
 | 1 | Erro de sistema de arquivos |
-| 2 | Argumentos invalidos |
-| 3 | Dependencia ou worker ausente |
+| 2 | Argumentos inválidos |
+| 3 | Dependência ou worker ausente |
 | 4 | Download/URL/metadados |
-| 5 | Midia ou extracao de audio |
-| 6 | Transcricao ou contrato do worker |
-| 7 | Exportacao MIDI |
+| 5 | Mídia ou extração de áudio |
+| 6 | Transcrição ou contrato do worker |
+| 7 | Exportação MIDI |
 | 130 | Cancelamento |
