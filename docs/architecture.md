@@ -94,23 +94,19 @@ flowchart TD
     job --> source{"Origem"}
     source -->|"YouTube"| download["Validar metadados e baixar vídeo com áudio"]
     source -->|"arquivo local"| local["Usar arquivo sem modificá-lo"]
-    download --> extract["Extrair e verificar WAV PCM"]
-    local --> extract
-    extract --> prepared["Relatório prepared"]
-    prepared --> mode{"Somente prepare?"}
-    mode -->|"sim"| finish["Retornar relatório e preservar WAV"]
-    mode -->|"não"| transcribe["Relatório transcribing e worker"]
-    transcribe --> validate["Validar resposta e eventos de notas"]
-    validate --> export["Exportar faixas MIDI ativas"]
-    export --> complete["Relatório completed"]
-    complete --> cleanup["Limpar intermediários salvo keep_intermediates"]
-    cleanup --> result["Retornar caminho do relatório"]
+    download --> prepared["Extrair WAV PCM, verificar e registrar prepared"]
+    local --> prepared
+    prepared -->|"prepare"| finish["Retornar relatório e preservar WAV"]
+    prepared -->|"convert"| transcribe["Relatório transcribing e worker"]
+    transcribe --> export["Validar notas e exportar MIDIs"]
+    export --> result["Registrar completed, limpar intermediários e retornar relatório"]
 ```
 
 O diagrama mostra o caminho de sucesso e as falhas anteriores ao job; falhas
 durante o processamento são detalhadas no ciclo de vida abaixo. A ordem é
 controlada por `prepare_media` e `run_conversion` em
-[pipeline.py](../src/youtube_midi/pipeline.py).
+[pipeline.py](../src/youtube_midi/pipeline.py). A limpeza final respeita
+`--keep-intermediates`.
 
 `prepare` termina na preparação de mídia. `convert` usa YourMT3+ por padrão:
 verifica fonte/checkpoint por SHA-256 e disponibilidade do dispositivo no runtime
@@ -138,30 +134,30 @@ sequenceDiagram
     participant Runtime
     participant MIDI
     participant Arquivos
-    CLI->>Pipeline: run_conversion(options, transcriber)
+    CLI->>Pipeline: run_conversion
     Pipeline->>Supervisor: check_ready()
-    Supervisor->>Supervisor: Verificar fonte e checkpoint por SHA-256
-    Supervisor->>Runtime: --check --device (processo curto)
-    Runtime-->>Supervisor: Dispositivo disponível ou erro
-    Note over Pipeline,Arquivos: Se o preflight falhar, não criar job
-    Pipeline->>Pipeline: Verificar ferramentas e entrada
+    Supervisor->>Supervisor: Verificar hashes<br/>de fonte e pesos
+    Supervisor->>Runtime: --check --device<br/>(processo curto)
+    Runtime-->>Supervisor: Dispositivo ou erro
+    Note over Pipeline,Supervisor: Falha de preflight:<br/>sem criar job
+    Pipeline->>Pipeline: Verificar entrada<br/>e ferramentas
     Pipeline->>Arquivos: Criar job e result.json preparing
     alt URL YouTube
-        Pipeline->>Pipeline: Validar metadados, baixar vídeo e extrair WAV
+        Pipeline->>Pipeline: Validar e baixar vídeo<br/>extrair WAV
     else Arquivo local
-        Pipeline->>Pipeline: Extrair WAV sem alterar a entrada
+        Pipeline->>Pipeline: Extrair WAV<br/>preservar entrada
     end
     Pipeline->>Arquivos: Relatório prepared, depois transcribing
-    Pipeline->>Supervisor: transcribe(audio, work, options)
+    Pipeline->>Supervisor: transcribe
     Supervisor->>Arquivos: transcription/request.json
-    Supervisor->>Runtime: --request e --response (novo processo)
-    Runtime->>Runtime: Carregar, segmentar, inferir e normalizar notas
+    Supervisor->>Runtime: --request / --response<br/>(novo processo)
+    Runtime->>Runtime: Carregar e inferir<br/>merge e normalização
     Runtime->>Arquivos: response.json e logs em worker.log
-    Runtime-->>Supervisor: Processo concluído com código zero
+    Runtime-->>Supervisor: Código zero
     Supervisor->>Arquivos: Ler response.json
-    Supervisor->>Supervisor: Validar schema, notas, duração e dispositivo
+    Supervisor->>Supervisor: Validar JSON e notas<br/>duração e dispositivo
     Supervisor-->>Pipeline: TranscriptionResult
-    Pipeline->>MIDI: export_tracks(tracks, bpm)
+    Pipeline->>MIDI: export_tracks
     MIDI->>Arquivos: MIDIs individuais e combinado quando possível
     MIDI-->>Pipeline: MidiExports e avisos
     Pipeline->>Arquivos: result.json completed
@@ -456,7 +452,7 @@ flowchart TB
           models["Volume youtube-midi-models"]
           gpu["GPU NVIDIA e driver do host (opcional)"]
           subgraph container["Container: mesma imagem para cpu / gpu"]
-                cli["/app/.venv: CLI, FFmpeg e Deno"]
+            cli["CLI em /app/.venv; ferramentas FFmpeg/ffprobe e Deno no PATH"]
                 ro["/input: somente leitura"]
                 jobs["/data/output: leitura e escrita"]
                 cache["/models/yourmt3: leitura e escrita"]
