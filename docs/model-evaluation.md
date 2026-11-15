@@ -1,11 +1,6 @@
 # Avaliação do modelo
 
-Status: **integração funcional validada com pesos reais; qualidade musical ainda
-não certificada**. O backend nativo produz MIDI em CPU/GPU sem downloads durante
-a inferência. Os testes musicais usam uma composição sintética própria, não um
-benchmark de músicas comerciais ou gravações com anotações por instrumento.
-
-## Ambiente observado em 2026-11-15
+## Ambiente
 
 | Item | Evidência |
 | --- | --- |
